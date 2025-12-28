@@ -1,0 +1,10 @@
+{
+  "/onboarding/institution/step1-criteria/page": "app/onboarding/institution/step1-criteria/page.js",
+  "/onboarding/institution/step2-upload/page": "app/onboarding/institution/step2-upload/page.js",
+  "/onboarding/institution/step3-mapping/page": "app/onboarding/institution/step3-mapping/page.js",
+  "/onboarding/institution/step4-preview/page": "app/onboarding/institution/step4-preview/page.js",
+  "/guardian/dashboard/page": "app/guardian/dashboard/page.js",
+  "/page": "app/page.js",
+  "/onboarding/user-type/page": "app/onboarding/user-type/page.js",
+  "/onboarding/ai-type/page": "app/onboarding/ai-type/page.js"
+}
