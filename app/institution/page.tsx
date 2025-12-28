@@ -38,14 +38,22 @@ export default function InstitutionLandingPage() {
                             </Button>
                         </Link>
 
-                        <Link href="/onboarding/institution/step1-criteria">
+                        <Link href="/institution/workspace/dashboard">
                             <Button
                                 variant="outline"
                                 size="xl"
-                                className="px-10 border-2 border-[#C2D5A8] text-[#4A5D23] bg-white hover:bg-[#F1F6E8] shadow-sm"
+                                className="px-10 border-2 border-[#8FA963] text-[#4A5D23] bg-white hover:bg-[#F1F6E8] shadow-sm font-bold"
                             >
-                                온보딩 미리보기
+                                관리자 로그인
                             </Button>
+                        </Link>
+
+                        <div className="w-full" />
+
+                        <Link href="/onboarding/institution/step1-criteria">
+                            <p className="text-sm font-bold text-[#8FA963] hover:underline cursor-pointer flex items-center gap-1">
+                                온보딩 과정 미리보기 <span className="text-xs">→</span>
+                            </p>
                         </Link>
                     </div>
                 </div>

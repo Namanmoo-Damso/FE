@@ -1,10 +1,13 @@
 {
-  "/onboarding/institution/step1-criteria/page": "app/onboarding/institution/step1-criteria/page.js",
-  "/onboarding/institution/step2-upload/page": "app/onboarding/institution/step2-upload/page.js",
-  "/onboarding/institution/step3-mapping/page": "app/onboarding/institution/step3-mapping/page.js",
+  "/onboarding/institution/complete/page": "app/onboarding/institution/complete/page.js",
   "/onboarding/institution/step4-preview/page": "app/onboarding/institution/step4-preview/page.js",
-  "/guardian/dashboard/page": "app/guardian/dashboard/page.js",
-  "/page": "app/page.js",
-  "/onboarding/user-type/page": "app/onboarding/user-type/page.js",
-  "/onboarding/ai-type/page": "app/onboarding/ai-type/page.js"
+  "/institution/workspace/dashboard/page": "app/institution/workspace/dashboard/page.js",
+  "/institution/workspace/ai-config/page": "app/institution/workspace/ai-config/page.js",
+  "/institution/workspace/staff/page": "app/institution/workspace/staff/page.js",
+  "/institution/workspace/users/[id]/page": "app/institution/workspace/users/[id]/page.js",
+  "/institution/workspace/settings/page": "app/institution/workspace/settings/page.js",
+  "/institution/workspace/monitoring/page": "app/institution/workspace/monitoring/page.js",
+  "/institution/workspace/users/page": "app/institution/workspace/users/page.js",
+  "/institution/workspace/stats/page": "app/institution/workspace/stats/page.js",
+  "/institution/workspace/alerts/page": "app/institution/workspace/alerts/page.js"
 }

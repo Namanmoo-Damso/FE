@@ -57,7 +57,7 @@ export default function InstitutionOnboardingComplete() {
 
                 {/* CTA */}
                 <div className="pt-8 space-y-4 max-w-md mx-auto">
-                    <Link href="/guardian/dashboard">
+                    <Link href="/institution/workspace/dashboard">
                         <Button
                             size="xxl"
                             className="w-full h-20 text-3xl font-black rounded-3xl bg-[#8FA963] text-white hover:bg-[#7A9351] shadow-2xl transition-all hover:scale-105"
