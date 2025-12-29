@@ -132,7 +132,7 @@ export default function InstitutionLandingPage() {
 
             {/* FOOTER */}
             <footer className="border-t border-[#E1EAD3] py-12 bg-white text-center">
-                <p className="text-[#4A5D23] font-bold mb-2">Damsō for Communities</p>
+                <p className="text-[#4A5D23] font-bold mb-2">Damso for Communities</p>
                 <p className="text-sm text-[#7B8C5A]">
                     © 담소 · 기관 전용 어르신 안부 확인 서비스
                 </p>
