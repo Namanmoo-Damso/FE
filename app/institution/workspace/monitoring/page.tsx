@@ -1,292 +1,242 @@
 "use client"
 
 import { useState } from "react"
-import {
-    Search,
-    Phone,
-    Mic,
-    ScanFace,
-    User,
-    Video,
-    Volume2
-} from "lucide-react"
-
-// --- Types & Mock Data ---
+// TODO: LiveKit 관련 훅 및 타입 임포트 (useLiveKitRoom, VideoTrack 등)
+import { Phone, Mic, ScanFace, Video, X, Maximize2, Search } from "lucide-react"
 
 type AlertType = "EMERGENCY" | "CAUTION" | "NORMAL"
+type MonitoringFilter = AlertType | "ALL"
+type MonitoringSearch = string
+
+interface AiAnalysis {
+    type: "FACE" | "VOICE" | "NONE"
+    message: string
+    timestamp: string
+}
 
 interface MonitoredUser {
     id: string
     name: string
     age: number
     status: AlertType
-    aiAnalysis: {
-        type: "FACE" | "VOICE" | "NONE"
-        message: string
-        timestamp: string
-    }
+    aiAnalysis: AiAnalysis
     isOnline: boolean
 }
 
-const MOCK_USERS: MonitoredUser[] = [
-    {
-        id: "U-101",
-        name: "박영자",
-        age: 78,
-        status: "EMERGENCY",
-        isOnline: true,
-        aiAnalysis: {
-            type: "VOICE",
-            message: "비명 소리 및 '살려줘' 감지",
-            timestamp: "방금 전",
-        },
-    },
-    {
-        id: "U-104",
-        name: "김철수",
-        age: 82,
-        status: "CAUTION",
-        isOnline: true,
-        aiAnalysis: {
-            type: "FACE",
-            message: "안면 비대칭 징후 감지",
-            timestamp: "2분 전",
-        },
-    },
-    {
-        id: "U-102",
-        name: "이순재",
-        age: 80,
-        status: "NORMAL",
-        isOnline: true,
-        aiAnalysis: {
-            type: "NONE",
-            message: "특이사항 없음",
-            timestamp: "-",
-        },
-    },
-    {
-        id: "U-105",
-        name: "정말숙",
-        age: 75,
-        status: "CAUTION",
-        isOnline: true,
-        aiAnalysis: {
-            type: "VOICE",
-            message: "반복적인 신음 소리",
-            timestamp: "5분 전",
-        },
-    },
-    {
-        id: "U-103",
-        name: "최옥분",
-        age: 77,
-        status: "NORMAL",
-        isOnline: false,
-        aiAnalysis: {
-            type: "NONE",
-            message: "연결 대기 중",
-            timestamp: "-",
-        },
-    },
+const FILTER_OPTIONS: { value: MonitoringFilter; label: string }[] = [
+    { value: "ALL", label: "전체" },
+    { value: "EMERGENCY", label: "긴급" },
 ]
 
+const MOCK_USERS: MonitoredUser[] = Array.from({ length: 16 }).map((_, i) => ({
+    id: `U-10${i}`,
+    name: i === 0 ? "박영자" : i === 1 ? "김철수" : `어르신 ${i + 1}`,
+    age: 70 + (i % 15),
+    status: i === 0 ? "EMERGENCY" : (i % 5 === 0 ? "CAUTION" : "NORMAL"),
+    isOnline: i !== 15,
+    aiAnalysis: {
+        type: i === 0 ? "VOICE" : (i % 5 === 0 ? "FACE" : "NONE"),
+        message: i === 0 ? "비명 소리 감지" : (i % 5 === 0 ? "안면 비대칭 감지" : "특이사항 없음"),
+        timestamp: "방금 전",
+    },
+}))
+
 export default function InstitutionMonitoringPage() {
-    const [filter, setFilter] = useState<AlertType | "ALL">("ALL")
+    const [filter, setFilter] = useState<MonitoringFilter>("ALL")
+    const [selectedId, setSelectedId] = useState<string | null>(null)
+    const [searchTerm, setSearchTerm] = useState<MonitoringSearch>("")
 
-    const filteredList = MOCK_USERS.filter((u) => {
-        if (filter === "ALL") return true
-        return u.status === filter
-    }).sort((a, b) => {
-        const score = { EMERGENCY: 3, CAUTION: 2, NORMAL: 1 }
-        return score[b.status] - score[a.status]
-    })
-
-    const stats = {
-        emergency: MOCK_USERS.filter(u => u.status === "EMERGENCY").length,
-        caution: MOCK_USERS.filter(u => u.status === "CAUTION").length,
-        online: MOCK_USERS.filter(u => u.isOnline).length,
-    }
+    const filteredUsers = getFilteredUsers(MOCK_USERS, filter, searchTerm).slice(0, 16)
+    const selectedUser = MOCK_USERS.find((user) => user.id === selectedId) ?? null
 
     return (
-        <>
-            {/* Header */}
-            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 flex-shrink-0 z-10">
-                <div>
-                    <h1 className="text-xl font-black text-slate-800 tracking-tight">실시간 모니터링</h1>
-                    <p className="text-slate-500 text-sm mt-0.5 font-semibold">관리 대상자의 실시간 영상 및 AI 이상 징후 분석</p>
-                </div>
+        <div className="relative flex flex-col h-screen bg-white overflow-hidden">
+            <MonitoringHeader 
+                filter={filter} 
+                onFilterChange={setFilter} 
+                searchTerm={searchTerm} 
+                onSearchChange={setSearchTerm} 
+            />
+            <MonitoringGrid
+                users={filteredUsers}
+                onSelect={(userId) => {
+                    setSelectedId(userId)
+                    // TODO: 확대 시 해당 트랙의 구독 품질을 HIGH로 변경
+                    // trackReference.setSubscribedQuality(VideoQuality.HIGH);
+                }}
+            />
+            <ZoomOverlay
+                user={selectedUser}
+                onClose={() => {
+                    setSelectedId(null)
+                    // TODO: 축소 시 해당 트랙의 구독 품질을 LOW로 복구하여 대역폭 절약
+                    // trackReference.setSubscribedQuality(VideoQuality.LOW);
+                }}
+            />
+        </div>
+    )
+}
 
-                <div className="flex items-center gap-6">
-                    {/* Status Filter */}
-                    <div className="flex gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-inner">
-                        <FilterTab label="전체" count={stats.online} active={filter === "ALL"} onClick={() => setFilter("ALL")} />
-                        <FilterTab label="긴급" count={stats.emergency} active={filter === "EMERGENCY"} onClick={() => setFilter("EMERGENCY")} type="EMERGENCY" />
-                        <FilterTab label="주의" count={stats.caution} active={filter === "CAUTION"} onClick={() => setFilter("CAUTION")} type="CAUTION" />
-                    </div>
+function getFilteredUsers(users: MonitoredUser[], filter: MonitoringFilter, search: MonitoringSearch) {
+    return users.filter((user) => {
+        const matchesFilter = filter === "ALL" || user.status === filter
+        const matchesSearch = search ? user.name.includes(search) : true
+        return matchesFilter && matchesSearch
+    })
+}
 
-                    <div className="relative hidden md:block">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 font-black" />
-                        <input
-                            type="text"
-                            placeholder="이름으로 검색"
-                            className="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm w-64 focus:outline-none focus:ring-2 focus:ring-slate-300 font-semibold transition-all shadow-sm"
-                        />
-                    </div>
-                </div>
-            </header>
-
-            {/* Monitoring Grid */}
-            <div className="flex-1 overflow-y-auto p-8 bg-[#F5F7FA]">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-8">
-                    {filteredList.map((user) => (
-                        <UserMonitoringCard key={user.id} user={user} />
+function MonitoringHeader({ 
+    filter, 
+    onFilterChange, 
+    searchTerm, 
+    onSearchChange 
+}: { 
+    filter: MonitoringFilter; 
+    onFilterChange: (value: MonitoringFilter) => void;
+    searchTerm: string;
+    onSearchChange: (value: string) => void;
+}) {
+    return (
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 flex-shrink-0 z-10">
+            <div className="flex items-center gap-4">
+                <h1 className="text-lg font-black text-slate-800 tracking-tight">관제 대시보드</h1>
+                <div className="flex gap-1 p-1 bg-slate-100 rounded-lg border border-slate-200">
+                    {FILTER_OPTIONS.map((option) => (
+                        <button
+                            key={option.value}
+                            onClick={() => onFilterChange(option.value)}
+                            className={`px-3 py-1 text-xs font-bold rounded ${filter === option.value
+                                ? option.value === "EMERGENCY"
+                                    ? "bg-[#C05656] text-white"
+                                    : "bg-white shadow-sm text-slate-900 border border-slate-200"
+                                : "text-slate-500"
+                                }`}
+                        >
+                            {option.label}
+                        </button>
                     ))}
-                    {filteredList.length === 0 && (
-                        <div className="col-span-full py-20 text-center">
-                            <p className="text-slate-400 font-black text-lg italic tracking-widest uppercase">현재 필터에 해당하는 대상자가 없습니다.</p>
+                </div>
+            </div>
+            
+            {/* 어르신 성함 검색창 */}
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input 
+                    type="text" 
+                    placeholder="어르신 성함 검색" 
+                    value={searchTerm}
+                    onChange={(e) => onSearchChange(e.target.value)}
+                    className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm w-64 focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all font-medium"
+                />
+            </div>
+        </header>
+    )
+}
+
+function MonitoringGrid({ users, onSelect }: { users: MonitoredUser[]; onSelect: (userId: string) => void }) {
+    return (
+        <main className="flex-1 p-3 bg-[#F5F7FA] overflow-hidden">
+            <div className="grid grid-cols-4 grid-rows-4 gap-3 h-full">
+                {users.map((user) => (
+                    <CompactUserCard key={user.id} user={user} onExpand={() => onSelect(user.id)} />
+                ))}
+            </div>
+        </main>
+    )
+}
+
+function ZoomOverlay({ user, onClose }: { user: MonitoredUser | null; onClose: () => void }) {
+    if (!user) return null
+
+    return (
+        <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-xl flex flex-col animate-in fade-in zoom-in duration-300">
+            <div className="h-16 flex items-center justify-between px-8 border-b border-slate-200">
+                <div className="flex items-center gap-4">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <h2 className="text-xl font-black text-slate-800">{user.name} 어르신 상세 모니터링</h2>
+                    <span className="text-slate-400 font-bold">UID: {user.id}</span>
+                </div>
+                <button
+                    onClick={onClose}
+                    className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
+                >
+                    <X size={32} />
+                </button>
+            </div>
+
+            <div className="flex-1 flex p-8 gap-8 overflow-hidden">
+                <div className="flex-[3] bg-slate-900 rounded-3xl border border-slate-200 relative overflow-hidden flex items-center justify-center shadow-2xl">
+                    {/* TODO: 실제 LiveKit VideoTrack 컴포넌트로 교체 */}
+                    {/* <VideoTrack trackRef={selectedUserTrack} /> */}
+                    <Video size={120} className="text-white/5 opacity-10" />
+
+                    <div className="absolute top-6 left-6 bg-black/50 px-4 py-2 rounded-full text-white text-sm font-black tracking-widest border border-white/20">
+                        LIVE STREAMING
+                    </div>
+
+                    {user.status !== "NORMAL" && (
+                        <div className="absolute bottom-10 left-10 right-10 bg-[#C05656]/90 p-6 rounded-2xl border border-red-400 backdrop-blur-md animate-bounce">
+                            <p className="text-white text-2xl font-black">{user.aiAnalysis.message}</p>
                         </div>
                     )}
                 </div>
-            </div>
-        </>
-    )
-}
 
-// --- Sub Components ---
-
-function FilterTab({ label, count, active, onClick, type = "NORMAL" }: any) {
-    let activeClass = "bg-white text-slate-900 shadow-md ring-1 ring-slate-200"
-    let inactiveClass = "text-slate-500 hover:text-slate-900 hover:bg-white/50"
-
-    if (active) {
-        if (type === "EMERGENCY") activeClass = "bg-[#C05656] text-white shadow-lg shadow-red-100"
-        if (type === "CAUTION") activeClass = "bg-[#D9A34A] text-white shadow-lg shadow-amber-50"
-    }
-
-    return (
-        <button
-            onClick={onClick}
-            className={`px-5 py-2 rounded-lg text-xs font-black uppercase tracking-[0.05em] transition-all duration-300 flex items-center gap-2 ${active ? activeClass : inactiveClass}`}
-        >
-            {label}
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${active ? "bg-black/10 text-white" : "bg-slate-200 text-slate-600"}`}>
-                {count}
-            </span>
-        </button>
-    )
-}
-
-function UserMonitoringCard({ user }: { user: MonitoredUser }) {
-    const isEmergency = user.status === "EMERGENCY"
-    const isCaution = user.status === "CAUTION"
-
-    const borderColor = isEmergency ? "border-[#C05656] ring-4 ring-red-500/10" : isCaution ? "border-[#D9A34A] shadow-amber-50 shadow-lg" : "border-slate-200"
-
-    let statusBadge = (
-        <span className="px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200">
-            정상 작동
-        </span>
-    )
-    if (isEmergency) {
-        statusBadge = (
-            <span className="px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider bg-[#C05656] text-white animate-pulse shadow-lg shadow-red-100">
-                긴급 상황
-            </span>
-        )
-    } else if (isCaution) {
-        statusBadge = (
-            <span className="px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider bg-[#D9A34A] text-white shadow-md shadow-amber-50">
-                위험 감지
-            </span>
-        )
-    }
-
-    return (
-        <div className={`bg-white rounded-2xl border-2 shadow-sm overflow-hidden flex flex-col transition-all duration-500 hover:shadow-2xl hover:-translate-y-1 ${borderColor}`}>
-
-            {/* Header */}
-            <div className="p-5 flex items-center justify-between bg-white border-b border-slate-50 relative z-10">
-                <div className="flex items-center gap-4 overflow-hidden">
-                    <div className="w-11 h-11 rounded-xl bg-slate-50 flex-shrink-0 flex items-center justify-center text-slate-400 border border-slate-100 shadow-inner">
-                        <User size={22} />
-                    </div>
-                    <div className="min-w-0">
-                        <h3 className="font-black text-slate-900 tracking-tight text-base truncate">
-                            {user.name} 어르신 <span className="font-bold text-xs text-slate-400 bg-slate-50 px-1.5 py-0.5 border rounded ml-1">{user.age}세</span>
-                        </h3>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">UID: {user.id}</p>
-                    </div>
-                </div>
-                <div className="flex-shrink-0">
-                    {statusBadge}
-                </div>
-            </div>
-
-            {/* Video Area */}
-            <div className="relative w-full bg-slate-950 aspect-[4/3] group overflow-hidden">
-                {user.isOnline ? (
-                    <>
-                        {/* Feed Simulation */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 z-0"></div>
-                        <div className="absolute inset-0 flex items-center justify-center opacity-5">
-                            <Video size={100} className="text-white" />
-                        </div>
-
-                        {/* Live Indicator */}
-                        <div className="absolute top-5 left-5 z-10">
-                            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full text-xs text-white font-black tracking-widest border border-white/20">
-                                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                                LIVE FEED
-                            </div>
-                        </div>
-
-                        {/* AI Overlay (Bottom) */}
-                        {(isEmergency || isCaution) && (
-                            <div className="absolute bottom-0 left-0 right-0 bg-black/85 backdrop-blur-xl p-5 border-t border-white/10 animate-in slide-in-from-bottom-full duration-500">
-                                <div className="flex items-start gap-4">
-                                    <div className={`mt-1 p-2 rounded-xl ${isEmergency ? "bg-[#C05656] text-white" : "bg-[#D9A34A] text-white"}`}>
-                                        {user.aiAnalysis.type === "VOICE" ? <Mic size={18} /> : <ScanFace size={18} />}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-black text-white/50 uppercase tracking-[0.1em] mb-1">AI DETECTED LOG</p>
-                                        <p className="text-white text-base leading-snug font-bold">
-                                            {user.aiAnalysis.message}
-                                        </p>
-                                    </div>
-                                    <span className="text-[10px] font-black text-white/40 uppercase tracking-tighter mt-1">{user.aiAnalysis.timestamp}</span>
+                <div className="flex-1 flex flex-col gap-6">
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                        <h4 className="text-slate-400 font-black text-xs uppercase tracking-widest mb-4">AI 실시간 분석 로그</h4>
+                        <div className="space-y-4 text-slate-800">
+                            <div className="flex gap-3">
+                                <div className="p-2 bg-blue-500 text-white rounded-lg h-fit"><Mic size={18} /></div>
+                                <div>
+                                    <p className="text-sm font-bold">음성 패턴 분석 중</p>
+                                    <p className="text-[11px] text-slate-400">실시간 연결됨</p>
                                 </div>
                             </div>
-                        )}
-
-                        {/* Overlay Actions */}
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-[2px]">
-                            <button className="bg-white/95 text-slate-900 font-extrabold text-xs px-6 py-3 rounded-full uppercase tracking-widest hover:bg-white transition-all shadow-xl">
-                                전체 화면 확대 (Zoom)
-                            </button>
+                            <div className="flex gap-3">
+                                <div className="p-2 bg-emerald-500 text-white rounded-lg h-fit"><ScanFace size={18} /></div>
+                                <div>
+                                    <p className="text-sm font-bold">안면 인식 활성화</p>
+                                    <p className="text-[11px] text-slate-400">정상 감지 중</p>
+                                </div>
+                            </div>
                         </div>
-                    </>
-                ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 border-y border-slate-800 text-slate-600 gap-4">
-                        <div className="w-16 h-16 rounded-full border-4 border-slate-800 flex items-center justify-center">
-                            <Video size={32} className="opacity-30" />
-                        </div>
-                        <span className="text-xs font-black uppercase tracking-widest">피드 오프라인</span>
                     </div>
-                )}
+
+                    <button className="w-full py-6 bg-[#4F5B75] hover:bg-[#3D475C] text-white rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all shadow-xl shadow-slate-200">
+                        <Phone size={24} />
+                        통화 연결 (Intercom)
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function CompactUserCard({ user, onExpand }: { user: MonitoredUser; onExpand: () => void }) {
+    const isEmergency = user.status === "EMERGENCY"
+
+    return (
+        <div
+            onClick={onExpand}
+            className={`group relative bg-white rounded-xl overflow-hidden border-2 cursor-pointer transition-all hover:shadow-lg active:scale-95 ${isEmergency ? "border-[#C05656] ring-2 ring-red-500/10" : "border-slate-200 hover:border-slate-300"
+                }`}
+        >
+            {/* TODO: 여기에 소형 VideoTrack 컴포넌트 삽입 */}
+            <div className="absolute inset-0 bg-black flex items-center justify-center">
+                <Video size={30} className="text-white/10 group-hover:text-white/20 transition-colors" />
             </div>
 
-            {/* Footer Action */}
-            <div className="p-5 bg-white border-t border-slate-100">
-                <button
-                    className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-sm font-black uppercase tracking-widest transition-all duration-300 shadow-sm ${isEmergency
-                        ? "bg-[#C05656] text-white hover:bg-[#A84A4A] shadow-xl shadow-red-100 ring-4 ring-red-500/10"
-                        : "bg-[#4F5B75] text-white hover:bg-[#3D475C] hover:shadow-slate-200 hover:shadow-xl"
-                        }`}
-                >
-                    <Phone size={18} className={isEmergency ? "animate-bounce" : ""} />
-                    긴급 상황 대응 전파 (Alert)
-                </button>
+            <div className="absolute inset-0 p-3 flex flex-col justify-between bg-gradient-to-t from-slate-900/40 via-transparent to-transparent">
+                <div className="flex justify-between items-start">
+                    <span className="text-slate-800 bg-white/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[11px] font-black">{user.name}</span>
+                    <div className={`w-2 h-2 rounded-full ${isEmergency ? "bg-red-500 animate-ping" : "bg-emerald-500"}`} />
+                </div>
+
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/5">
+                    <Maximize2 className="text-slate-400 w-8 h-8" />
+                </div>
+
+                <div className="text-[9px] text-white font-bold opacity-80 tracking-widest">{user.id}</div>
             </div>
         </div>
     )
