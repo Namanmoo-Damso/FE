@@ -1,35 +1,49 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Mail, Lock, AlertCircle, LogIn } from 'lucide-react';
+import { useAuth } from '@/app/context/AuthContext';
+
+type FieldName = 'email' | 'password';
+
+interface LoginFormState {
+  email: string;
+  password: string;
+}
+
+const INITIAL_FORM_STATE: LoginFormState = {
+  email: '',
+  password: '',
+};
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const LOGIN_ENDPOINT = '/api/auth/login';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+  const { setAuthInfo } = useAuth();
+  const [formData, setFormData] = useState<LoginFormState>(INITIAL_FORM_STATE);
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
+  const validateForm = useCallback(() => {
+    const nextErrors: Partial<Record<FieldName, string>> = {};
 
     if (!formData.email.trim()) {
-      newErrors.email = '이메일을 입력해주세요';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = '올바른 이메일 형식이 아닙니다';
+      nextErrors.email = '이메일을 입력해주세요';
+    } else if (!EMAIL_REGEX.test(formData.email)) {
+      nextErrors.email = '올바른 이메일 형식이 아닙니다';
     }
 
     if (!formData.password) {
-      newErrors.password = '비밀번호를 입력해주세요';
+      nextErrors.password = '비밀번호를 입력해주세요';
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }, [formData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,16 +55,12 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // TODO: 추후 axios로 리팩토링
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(LOGIN_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
+        body: JSON.stringify(formData),
       });
 
       const data = await response.json();
@@ -59,31 +69,45 @@ export default function LoginPage() {
         throw new Error(data.message || '로그인에 실패했습니다');
       }
 
-      // TODO: 토큰을 localStorage 또는 상태관리에 저장
-      // localStorage.setItem('accessToken', data.accessToken);
-      // localStorage.setItem('refreshToken', data.refreshToken);
+      // 백엔드 응답 구조: { accessToken, refreshToken, user: { institutionId, ... } }
+      const institutionId = data?.user?.institutionId;
+      if (!institutionId) {
+        throw new Error('기관 ID를 받아오지 못했습니다.');
+      }
+
+      // 전역 Auth 컨텍스트에 저장 (localStorage 포함)
+      setAuthInfo(data.accessToken, data.refreshToken, institutionId);
 
       // 성공 시 대시보드로 이동
       router.push('/institution/workspace/dashboard');
-    } catch (error: any) {
-      setErrors(prev => ({
-        ...prev,
-        email: error.message || '로그인 중 오류가 발생했습니다',
-      }));
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : '로그인 중 오류가 발생했습니다';
+      setErrors(prev => ({ ...prev, email: message }));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
+  const handleChange = useCallback(
+    (field: FieldName, value: string) => {
+      setFormData(prev => ({ ...prev, [field]: value }));
+      if (errors[field]) {
+        setErrors(prev => ({ ...prev, [field]: undefined }));
+      }
+    },
+    [errors],
+  );
 
-  const isFormValid = formData.email && formData.password && Object.keys(errors).length === 0;
+  const isFormValid = useMemo(
+    () =>
+      !!formData.email &&
+      !!formData.password &&
+      Object.values(errors).every(value => !value),
+    [errors, formData.email, formData.password],
+  );
 
   return (
     <div className="min-h-screen bg-[#F7F9F2] py-16 px-10">
@@ -110,7 +134,7 @@ export default function LoginPage() {
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => handleChange('email', e.target.value)}
+                onChange={e => handleChange('email', e.target.value)}
                 placeholder="example@email.com"
                 className={`w-full px-4 py-4 rounded-xl border-2 bg-[#F7F9F2] focus:outline-none focus:border-[#8FA963] transition-colors ${
                   errors.email ? 'border-red-300' : 'border-[#E1EAD3]'
@@ -135,7 +159,7 @@ export default function LoginPage() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
-                  onChange={(e) => handleChange('password', e.target.value)}
+                  onChange={e => handleChange('password', e.target.value)}
                   placeholder="비밀번호를 입력하세요"
                   className={`w-full px-4 py-4 rounded-xl border-2 bg-[#F7F9F2] focus:outline-none focus:border-[#8FA963] transition-colors pr-12 ${
                     errors.password ? 'border-red-300' : 'border-[#E1EAD3]'
@@ -147,7 +171,11 @@ export default function LoginPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-[#7B8C5A] hover:text-[#4A5D23] transition-colors"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
               {errors.password && (
@@ -177,9 +205,12 @@ export default function LoginPage() {
               <div className="flex items-start gap-3">
                 <span className="text-xl">🔐</span>
                 <div className="flex-1 space-y-1">
-                  <p className="text-sm font-bold text-[#4A5D23]">안전한 로그인</p>
+                  <p className="text-sm font-bold text-[#4A5D23]">
+                    안전한 로그인
+                  </p>
                   <p className="text-xs text-[#6E7F4F] leading-relaxed">
-                    회원가입 시 등록한 이메일과 비밀번호로 로그인하세요. 계정 정보는 안전하게 보호됩니다.
+                    회원가입 시 등록한 이메일과 비밀번호로 로그인하세요. 계정
+                    정보는 안전하게 보호됩니다.
                   </p>
                 </div>
               </div>
@@ -226,13 +257,19 @@ export default function LoginPage() {
           <div className="flex items-start gap-3">
             <span className="text-2xl">💡</span>
             <div className="flex-1 space-y-2">
-              <p className="text-sm font-bold text-[#4A5D23]">아직 계정이 없으신가요?</p>
+              <p className="text-sm font-bold text-[#4A5D23]">
+                아직 계정이 없으신가요?
+              </p>
               <p className="text-xs text-[#6E7F4F] leading-relaxed">
                 새로운 계정을 만들어 서비스를 이용하세요.
               </p>
               <button
                 type="button"
-                onClick={() => router.push('/onboarding/institution/register/new-registration')}
+                onClick={() =>
+                  router.push(
+                    '/onboarding/institution/register/new-registration',
+                  )
+                }
                 className="text-sm font-bold text-[#8FA963] hover:text-[#7A9351] transition-colors underline"
               >
                 회원가입 하기 →
