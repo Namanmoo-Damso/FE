@@ -71,12 +71,14 @@ export default function LoginPage() {
 
       // 백엔드 응답 구조: { accessToken, refreshToken, user: { institutionId, ... } }
       const institutionId = data?.user?.institutionId;
+      const userName = data?.user?.name;
+
       if (!institutionId) {
         throw new Error('기관 ID를 받아오지 못했습니다.');
       }
 
       // 전역 Auth 컨텍스트에 저장 (localStorage 포함)
-      setAuthInfo(data.accessToken, data.refreshToken, institutionId);
+      setAuthInfo(data.accessToken, data.refreshToken, institutionId, userName);
 
       // 성공 시 대시보드로 이동
       router.push('/institution/workspace/dashboard');
