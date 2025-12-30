@@ -2,11 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, Mail, User, Lock, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, User, Lock, AlertCircle, Building2, MapPin } from 'lucide-react';
 
 export default function NewRegistrationPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
+    institutionName: '',
+    institutionAddress: '',
     name: '',
     email: '',
     password: '',
@@ -19,6 +21,14 @@ export default function NewRegistrationPage() {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
+
+    if (!formData.institutionName.trim()) {
+      newErrors.institutionName = '기관 이름을 입력해주세요';
+    }
+
+    if (!formData.institutionAddress.trim()) {
+      newErrors.institutionAddress = '기관 주소를 입력해주세요';
+    }
 
     if (!formData.name.trim()) {
       newErrors.name = '이름을 입력해주세요';
@@ -63,6 +73,8 @@ export default function NewRegistrationPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          institutionName: formData.institutionName,
+          institutionAddress: formData.institutionAddress,
           name: formData.name,
           email: formData.email,
           password: formData.password,
@@ -76,7 +88,7 @@ export default function NewRegistrationPage() {
       }
 
       // 성공 시 다음 단계로 이동
-      router.push('/onboarding/institution/step1-criteria');
+      router.push('/institution/workspace/dashboard');
     } catch (error: any) {
       setErrors(prev => ({
         ...prev,
@@ -95,7 +107,8 @@ export default function NewRegistrationPage() {
     }
   };
 
-  const isFormValid = formData.name && formData.email && formData.password &&
+  const isFormValid = formData.institutionName && formData.institutionAddress &&
+                      formData.name && formData.email && formData.password &&
                       formData.confirmPassword && Object.keys(errors).length === 0;
 
   return (
@@ -114,6 +127,52 @@ export default function NewRegistrationPage() {
         {/* Form Card */}
         <div className="bg-white p-10 rounded-3xl shadow-sm border border-[#E1EAD3]">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Institution Name Field */}
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-[#4A5D23] flex items-center gap-2">
+                <Building2 className="w-4 h-4" />
+                기관 이름 <span className="text-[#8FA963]">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.institutionName}
+                onChange={(e) => handleChange('institutionName', e.target.value)}
+                placeholder="기관 이름을 입력하세요"
+                className={`w-full px-4 py-4 rounded-xl border-2 bg-[#F7F9F2] focus:outline-none focus:border-[#8FA963] transition-colors ${
+                  errors.institutionName ? 'border-red-300' : 'border-[#E1EAD3]'
+                }`}
+              />
+              {errors.institutionName && (
+                <div className="flex items-center gap-2 text-sm text-red-600">
+                  <AlertCircle className="w-4 h-4" />
+                  {errors.institutionName}
+                </div>
+              )}
+            </div>
+
+            {/* Institution Address Field */}
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-[#4A5D23] flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                기관 주소 <span className="text-[#8FA963]">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.institutionAddress}
+                onChange={(e) => handleChange('institutionAddress', e.target.value)}
+                placeholder="기관 주소를 입력하세요"
+                className={`w-full px-4 py-4 rounded-xl border-2 bg-[#F7F9F2] focus:outline-none focus:border-[#8FA963] transition-colors ${
+                  errors.institutionAddress ? 'border-red-300' : 'border-[#E1EAD3]'
+                }`}
+              />
+              {errors.institutionAddress && (
+                <div className="flex items-center gap-2 text-sm text-red-600">
+                  <AlertCircle className="w-4 h-4" />
+                  {errors.institutionAddress}
+                </div>
+              )}
+            </div>
+
             {/* Name Field */}
             <div className="space-y-2">
               <label className="text-sm font-bold text-[#4A5D23] flex items-center gap-2">
