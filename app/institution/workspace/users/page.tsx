@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Users,
   Search,
@@ -16,6 +16,8 @@ import {
 import Link from 'next/link';
 import { useDebounce } from '@/hooks/use-debounce';
 import RegistrationModal from './component/registrationmodal';
+import { useAuth } from '@/app/context/AuthContext';
+import { fetchWithAuth } from '@/lib/api';
 
 // --- API 타입 정의 ---
 type RiskLevel = 'HIGH' | 'MEDIUM' | 'LOW';
@@ -34,10 +36,17 @@ interface CareUser {
   regType: 'INSTITUTION' | 'PRIVATE';
 }
 
-// 로그인 미구현 상태에서의 임시 정보 (로그인 연동 시 제거 예정)
-const INSTITUTION_ID = 'INST-004';
+interface FilterButtonProps {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+  isCritical?: boolean;
+}
 
 export default function UserManagementPage() {
+  const { institutionId } = useAuth();
+
   const [users, setUsers] = useState<CareUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,47 +56,59 @@ export default function UserManagementPage() {
 
   // 검색 최적화: 타이핑을 멈추고 300ms 후 필터링 반영
   const debouncedSearch = useDebounce(searchTerm, 300);
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://4.sodam.store'; // 환경변수 없을 때 기본값
 
-  // 1. 데이터 가져오기 로직 (API 연동)
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
+    if (!institutionId) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/care-users`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Institution-Id': INSTITUTION_ID,
-          // "Authorization": `Bearer ${token}` // 로그인 연동 시 사용
-        },
-      });
+      setError(null);
+      const response = await fetchWithAuth('/api/care-users');
 
       if (!response.ok) throw new Error('데이터를 불러오는데 실패했습니다.');
 
       const data = await response.json();
       setUsers(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : '데이터를 불러오는데 실패했습니다.';
+      setError(message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [institutionId]);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
-  // 2. 필터링 및 검색 로직 (debouncedSearch 사용)
-  const filteredUsers = users.filter(user => {
-    const matchesFilter = filterType === 'ALL' || user.riskLevel === 'HIGH';
-    const matchesSearch =
-      user.name.includes(debouncedSearch) ||
-      user.address.includes(debouncedSearch) ||
-      (user.manager && user.manager.includes(debouncedSearch));
+  const filteredUsers = useMemo(
+    () =>
+      users.filter(user => {
+        const matchesFilter = filterType === 'ALL' || user.riskLevel === 'HIGH';
+        const matchesSearch =
+          user.name.includes(debouncedSearch) ||
+          user.address.includes(debouncedSearch) ||
+          (user.manager && user.manager.includes(debouncedSearch));
 
-    return matchesFilter && matchesSearch;
-  });
+        return matchesFilter && matchesSearch;
+      }),
+    [debouncedSearch, filterType, users],
+  );
 
-  if (loading)
+  const highRiskCount = useMemo(
+    () => users.filter(user => user.riskLevel === 'HIGH').length,
+    [users],
+  );
+
+  const showInitialLoader = loading && (!users.length || !institutionId);
+
+  if (showInitialLoader)
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
         <Loader2 className="w-10 h-10 animate-spin mb-4" />
@@ -104,7 +125,7 @@ export default function UserManagementPage() {
             대상자 관리
           </h1>
           <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wider">
-            기관번호: {INSTITUTION_ID}
+            기관번호: {institutionId || '불러오는 중...'}
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -128,7 +149,7 @@ export default function UserManagementPage() {
           />
           <FilterButton
             label="중점 관리"
-            count={users.filter(u => u.riskLevel === 'HIGH').length}
+            count={highRiskCount}
             active={filterType === 'HIGH'}
             onClick={() => setFilterType('HIGH')}
             isCritical
@@ -288,12 +309,17 @@ export default function UserManagementPage() {
   );
 }
 
-// --- 하위 컴포넌트 ---
-
-function FilterButton({ label, count, active, onClick, isCritical }: any) {
+function FilterButton({
+  label,
+  count,
+  active,
+  onClick,
+  isCritical,
+}: FilterButtonProps) {
   return (
     <button
       onClick={onClick}
+      aria-pressed={active}
       className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-3 ${
         active
           ? isCritical
